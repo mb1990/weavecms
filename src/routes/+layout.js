@@ -18,7 +18,7 @@ export async function load(event) {
 	// Fetch session data
 	const { data: { session } } = await supabase.auth.getSession();
 
-	// If no session, return an empty response to prevent errors
+	// If no session, return an empty response
 	if (!session || !session.user) {
 		return {
 			supabase,
@@ -34,7 +34,7 @@ export async function load(event) {
 		.from('profiles')
 		.select('*')
 		.eq('id', session.user?.id)
-		.maybeSingle() || {};  // Ensure profile is always an object
+		.maybeSingle() || {};
 
 	// Fetch sites & starters
 	const [{ data: sites }, { data: starters }] = await Promise.all([
@@ -42,9 +42,14 @@ export async function load(event) {
 		supabase.from('sites').select('*').order('created_at', { ascending: true }).match({ is_starter: true })
 	]);
 
-	// Redirect collaborators who are not full users
-	if (!profile?.is_full_user && event.url.pathname.startsWith('/dashboard')) {
-		throw redirect(307, `/${sites?.[0]?.id || ''}`);
+	// Redirect collaborators who are not full users **only if they're not already on the correct site**
+	if (
+		!profile?.is_full_user &&
+		event.url.pathname.startsWith('/dashboard') &&
+		sites?.[0]?.id &&
+		event.url.pathname !== `/${sites[0].id}`
+	) {
+		throw redirect(307, `/${sites[0].id}`);
 	}
 
 	return {
